@@ -3,9 +3,147 @@
   
     
     <entry>
-      <title><![CDATA[WordPress 配置发邮件]]></title>
+      <title><![CDATA[Dockerfile入门文章]]></title>
+      <url>/2017/04/14/Dockerfile%E5%85%A5%E9%97%A8%E6%96%87%E7%AB%A0/</url>
+      <content type="html"><![CDATA[<h2 id="Dockerfile构建Tomcat"><a href="#Dockerfile构建Tomcat" class="headerlink" title="Dockerfile构建Tomcat"></a>Dockerfile构建Tomcat</h2><p><span class="s1"><strong>1、什么是Docker？</strong></span></p>
+<p><span class="s1">Docker是个新生的事物，概念类似虚拟化。简单来说，Docker就是一个应用程序执行容器，类似虚拟机的概念。但是与虚拟化不同的是有以下几点：</span></p>
+<p><span class="s1"><strong>A) </strong>虚拟化系统一般都是指操作系统镜像，比较复杂，称为“系统”；而docker开源而且轻量，称为“容器”，单个容器适合部署少量应用。</span><br><a id="more"></a><br><span class="s1"><strong>B) </strong>传统的虚拟化技术在构建系统的时候较为复杂，需要大量的人力；而docker可以通过Dockfile来构建整个容器，重启和构建,而且速度很快。更重要的是Dockfile可以手动编写，这样开发人员可以通过发布Dockfile来指导系统环境和依赖，这样对于持续交付十分有利。</span></p>
+<p><span class="s1"><strong>C) </strong>传统的虚拟化技术使用快照来保存状态；而docker在保存状态上不仅更为轻便和低成本，而且引入了类似源代码管理机制，将容器的快照历史版本一一记录，切换成本很低。</span></p>
+<p><span class="s1"><strong>2、如何快速通过Dockerfile构建镜像</strong></span></p>
+<p><span class="s1"><strong>首要条件</strong>：你的电脑得先安装docker环境。</span></p>
+<p><span class="s1">如何安装docker就不在此赘述了，这不是本文讨论的重点。接下来，通过做一个Tomcat镜像来教大家如何使用DockerFile来构建应用。</span></p>
+<p><span class="s1">1、创建一个Dockerfile</span></p>
+<p><span class="s1">Dockerfile命名必须为“Dockerfile”,docker构建时会找指定目录中的Dockerfile来进行构建。</span></p>
+<p><span class="s1">2、编写Dockerfile</span></p>
+<p><span class="s1">1)首先，我们需要指定一个基础镜像，为了方便立即，这里从Ubuntu镜像开始。</span></p>
+<blockquote>
+<p><span class="s1"><strong>FROM ubuntu:14.04</strong></span></p>
+</blockquote>
+<p><span class="s1">通过FROM指令，docker编译程序能够知道在哪个基础镜像执行来进行编译。所有的Dockerfile都必须以FROM指令开始。通过这句，我们相当于有了一个最基本的ubuntu系统。</span></p>
+<p><span class="s1">2）其他环境配置。</span></p>
+<p><span class="s1">我们可以像这样指定Dockerfile的作者。</span></p>
+<blockquote>
+<p><span class="s1"><strong>MAINTAINER example &lt;example@goodrain.com&gt;</strong></span></p>
+</blockquote>
+<p><span class="s1">另外我们需要指定时区，否则我们做出的镜像可能会跟当前时间不符。</span></p>
+<blockquote>
+<p><span class="s1"><strong>RUN echo “Asia/Shanghai” &gt; /etc/timezone;dpkg-reconfigure -f noninteractive tzdata</strong></span></p>
+</blockquote>
+<p><span class="s1">我们平时在自己电脑上如何安装Tomcat就可以在docker容器中如何安装。</span></p>
+<p><span class="s1">3）Tomcat必要软件安装。</span></p>
+<p><span class="s1">我们此时使用的Ubuntu系统其实是很简陋的系统，上面很多系统都没有。所以我先安装一些必要的软件。</span></p>
+<blockquote>
+<p><span class="s1"><strong>RUN apt-get update &amp;&amp; apt-get install -y curl vim net-tools &amp;&amp; \</strong></span></p>
+<p><span class="s1"><strong> rm -rf /var/lib/apt/lists/* &amp;&amp; mkdir -p /app</strong></span></p>
+</blockquote>
+<p><span class="s1"><strong>RUN</strong>指令用来在docker的编译环境中运行指定命令。这里我安装了<strong>curl、vim、net-tools。</strong>其中curl用来获取java和tomcat的安装包，vim和net-tools用来调试。并创建/app目录</span></p>
+<p><span class="s1">4）指定工作目录</span></p>
+<p><span class="s1">上一步中创建了 /app目录，使用 <strong>WORKDIR /app </strong>可以将工作目录定位到/app 目录下</span></p>
+<p><span class="s1">5）获取安装软件</span></p>
+<p><span class="s1"><span class="Apple-converted-space">  </span>第3)安装完成了curl,我们使用curl工具来获取安装包。</span></p>
+<blockquote>
+<p><span class="s1"><strong>RUN<span class="Apple-converted-space">  </span>curl -L ‘<a href="http://download.oracle.com/otn-pub/java/jdk/7u65-b17/jdk-7u65-linux-x64.tar.gz" target="_blank" rel="external">http://download.oracle.com/otn-pub/java/jdk/7u65-b17/jdk-7u65-linux-x64.tar.gz</a>‘ -H ‘Cookie: oraclelicense=accept-securebackup-cookie; gpw_e24=Dockerfile’ | tar -xz \</strong></span></p>
+<p><span class="s1"><strong><span class="Apple-converted-space">    </span>&amp;&amp; curl -L ‘<a href="http://archive.apache.org/dist/tomcat/tomcat-7/v7.0.8/bin/apache-tomcat-7.0.8.tar.gz" target="_blank" rel="external">http://archive.apache.org/dist/tomcat/tomcat-7/v7.0.8/bin/apache-tomcat-7.0.8.tar.gz</a>‘ | tar -xz</strong></span></p>
+</blockquote>
+<p><span class="s1">以上命令将会从指定地址下载安装包，并解压到当前目录（上一步我们指定了工作空间为/app，所以会解压到此目录下）</span></p>
+<p><span class="s1">6）指定运行脚本</span></p>
+<p><span class="s1">截止到上一步，我们已经将需要的准备工作都做好了，剩下的还有Java环境变量的设置，Tomcat环境变量设置（非必须）和Tomcat的启动。</span></p>
+<blockquote>
+<p><span class="s1"><strong>COPY tomcat7.sh /app/tomcat7.sh</strong></span></p>
+<p><span class="s1"><strong>RUN chmod +x /app/tomcat7.sh</strong></span></p>
+</blockquote>
+<p><span class="s1">上面的两行命令会将与Dockerfile同级目录的tomcat7.sh文件上传到docker容器中的/app目录下，并且给该文件赋予可执行的权限。</span></p>
+<p><span class="s1">看一眼该脚本的内容便一目了然了。</span></p>
+<blockquote>
+<p><span class="s1"> <strong># Java环境变量配置</strong></span></p>
+<p><span class="s1"><strong> export JAVA_HOME=/app/jdk1.7.0_65</strong></span></p>
+<p><span class="s1"><strong> export PATH=$JAVA_HOME/bin:$PATH</strong></span></p>
+<p><span class="s1"><strong> export CLASSPATH=.:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar</strong></span></p>
+<p><span class="s1"><strong> # Tomcat环境变量配置</strong></span></p>
+<p><span class="s1"><strong> export TOMCAT_HOME=/app/apache-tomcat-7.0.8</strong></span></p>
+<p><span class="s1"><strong> export PATH=$TOMCAT_HOME/bin:$PATH</strong></span></p>
+<p><span class="s1"><strong> # 启动 Tomcat</strong></span></p>
+<p><span class="s1"><strong> exec $TOMCAT_HOME/bin/catalina.sh run</strong></span></p>
+</blockquote>
+<p><span class="s1">7) 指定端口</span></p>
+<blockquote>
+<p><span class="s1"><strong>EXPOSE 8080</strong></span></p>
+</blockquote>
+<p><span class="s1">通常情况下，Tomcat启动后会监听8080端口，在容器中也一样。</span></p>
+<p><span class="s1">EXPOSE指令用于标明，这个镜像中的应用将会侦听某个端口，并且希望能将这个端口映射到主机的网络界面上</span></p>
+<p><span class="s1">8）指定脚本的运行</span></p>
+<p><span class="s1">至此，我们要做的准备工作就做完了，但是还差一步，运行我们在第6步创建的脚本，使用下面的这条命令即可。</span></p>
+<blockquote>
+<p><span class="s1"><strong>ENTRYPOINT [“/app/tomcat7.sh”]</strong></span></p>
+</blockquote>
+<p><span class="s1">ENTRYPOINT<span class="Apple-converted-space">  </span>用于标明一个镜像作为容器运行时，最后要执行的程序或命令。</span></p>
+<p><span class="s1">这样我们简单的一个Tomcat的Dockerfile就编写完成了。</span></p>
+<p><span class="s1">3.构建镜像</span></p>
+<p><span class="s1">进入Dockerfile所在目录，运行命令 <strong>docker build -t mytomcat .</strong> (注意最后有个点用来表示当前目录。初次构建速度会比较慢，需要多等一会) </span></p>
+<p><span class="s1">出现如下信息就构建成功了 </span></p>
+<p><span class="s1">4.运行docker容器</span></p>
+<blockquote>
+<p><span class="s1"><strong>docker run -i -t -p 5000:8080 mytom</strong></span></p>
+</blockquote>
+<p><span class="s1">其中docker run 用于运行一个容器 。</span></p>
+<p><span class="s1"><strong> -t</strong> 在容器指定一个伪终端或者终端;</span></p>
+<p><span class="s1"> <strong>-i</strong> 进行命令交互;</span></p>
+<p><span class="s1"> <strong>-p</strong> 匹配镜像内的网络端口号,即我们可以通过宿主机中访问5000端口来达到访问容器8080端口的目的。</span></p>
+<p><span class="s1">5.查看构建好的镜像和运行的容器</span></p>
+<p><span class="s1"><strong>docker images<span class="Apple-converted-space">  </span></strong>#查看镜像 </span></p>
+<p><span class="s1"><strong>docker ps -a </strong>#查看所有的容器 </span></p>
+<p><span class="s1">6.查看服务是否运行</span></p>
+<p><span class="s1">在宿主机中我们输入localhost:5000访问，出现如下界面，表示Tomcat成功运行。 </span></p>
+<p><span class="s1">至此，我们就成功的创建了一个Tomcat镜像了，当然这里只是为了简单演示，所以镜像做的比较简单，官方的Tomcat镜像比这复杂的多，在熟悉了Dockerfile后可以去看看官方的做法。</span></p>
+<p><span class="s1">6.其他</span></p>
+<p><span class="s1">在做镜像的时候有那么多步骤，根本不可能一次将所有的步骤完成，所以，这里教给大家一个小技巧。</span></p>
+<p><span class="s1">在编写完Dockerfile到第二步的时候，其实可以先使用一个脚本先运行着，然后进入容器内部进行操作。笔者在编写Dockerfile时先使用如下命令</span></p>
+<blockquote>
+<p><span class="s1"><strong> COPY run.sh /app/run.sh</strong></span></p>
+<p><span class="s1"><strong> RUN chmod +x /app/run.sh</strong></span></p>
+<p><span class="s1"><strong> ENTRYPOINT [“/app/run.sh”]</strong></span></p>
+</blockquote>
+<p><span class="s1">run.sh脚本的内容如下</span></p>
+<blockquote>
+<p><span class="s1"><strong> #!/bin/bash</strong></span></p>
+<p><span class="s1"><strong> sleep 15</strong></span></p>
+<p><span class="s1"><strong> while true</strong></span></p>
+<p><span class="s1"><strong> do</strong></span></p>
+<p><span class="s1"><strong><span class="Apple-converted-space">     </span>echo “true”</strong></span></p>
+<p><span class="s1"><strong><span class="Apple-converted-space">     </span>sleep 180</strong></span></p>
+<p><span class="s1"><strong> done</strong></span></p>
+</blockquote>
+<p><span class="s1">其实就是一段死循环代码代替原有的tomcat7.sh,接着就可以build和run我们的容器了。容器运行起来后使用<strong>docker exec -it container_id bash </strong>进入docker容器。此时就和我们平时装软件的方式一样了，做完一个步骤，在Dockerfile中记录一条，这样Dockerfile也就做出来了。(ps:<strong>exit</strong>退出容器。)</span></p>
+<p><span class="s1">特别注意的一点，如果做好镜像以后，在镜像中有需要保存的数据（持久化目录）需要我们在Dockerfile中指定持久化目录。为了能够保存（持久化）数据以及共享容器间的数据，Docker提出了Volume的概念。简单来说，Volume就是目录或者文件，它可以绕过默认的联合文件系统，而以正常的文件或者目录的形式存在于宿主机上。并且我们运行容器的时候需要使用使用 -v 来声明Volume，如：</span></p>
+<blockquote>
+<p><span class="s1"><strong>docker run -it -v /home/dock/logs:/usr/logs tomcat /bin/bash</strong></span></p>
+</blockquote>
+<p><span class="s1">冒号前为宿主机目录，必须为绝对路径，冒号后为镜像内挂载的路径，这样容器内更改的数据就被写到宿主机上了。</span></p>
+<p><span class="s1">拥有了Tomcat服务器后，就可以跑写好的java-web程序了，如何运行java-web程序就不在此详述了，跟普通运行java-web程序一样。</span></p>
+<p><span class="s1">同样的，如果你有一个web应用，将其放入Docker容器中，写好Dockerfile，构建好应用运行需要的环境后，就可以很快的使用应用了。</span></p>
+<p><span class="s1">Dockerfile源码已放到好雨的github公共仓库了。地址：<a href="https://github.com/goodrain-apps/tomcat-demo" target="_blank" rel="external"><span class="s2">https://github.com/goodrain-apps/tomcat-demo</span></a> 。上面有很多使用Dockerfile构建的项目。可以方便大家学习。</span></p>
+<p><span class="s1">最后补充一点，好雨云平台目前支持java，php,python等多种语言的应用，不用自己构建具体环境，可以直接从源码进行构建，十分方便。以上说的Dockerfile也是支持的。如果有写好的程序想要跑起来可以参照好雨官方文档进行部署。</span></p>
+]]></content>
+      
+        <categories>
+            
+            <category> Docker </category>
+            
+        </categories>
+        
+        
+        <tags>
+            
+            <tag> Dockerfile </tag>
+            
+        </tags>
+        
+    </entry>
+    
+    <entry>
+      <title><![CDATA[WordPress 配置]]></title>
       <url>/2017/03/18/WordPress-%E5%AE%89%E8%A3%85%E9%85%8D%E7%BD%AE%E8%AE%B0%E5%BD%95/</url>
-      <content type="html"><![CDATA[<ul>
+      <content type="html"><![CDATA[<h2 id="wp邮件配置"><a href="#wp邮件配置" class="headerlink" title="wp邮件配置"></a>wp邮件配置</h2><ul>
 <li><p>安装wordpress</p>
 <p>按照文档安装，解压wordpress安装包时要讲wordpress安装包的权限改为apache，因为apache的默认使用用户和用户组为apache，详情可以参考apache服务器配置文件httpd.conf.</p>
 </li>
