@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no" />
+<meta name="author" content="大喵" />
+
+
+
+<meta name="description" content="Docker 网络构造：Docker如何使用Linux iptables 和 Interfaces原文出处 我使用docker至今已有一段时间了，与绝大部分的人一样，我被docker强大的功能和易用性深深的折服。简单方便是docker的核心之一，它强大的功能被抽象成了非常简单的命令。当我在使用和学习docker的时候，我很想知道docker在后台都做了一些什么事情，特别是在网络这一块（我最感兴趣的">
+<meta name="keywords">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Docker 有关网络的一篇文章">
+<meta property="og:url" content="rilweic.github.io/2017/03/15/Docker-有关网络的一篇文章/index.html">
+<meta property="og:site_name" content="RILWEIC">
+<meta property="og:description" content="Docker 网络构造：Docker如何使用Linux iptables 和 Interfaces原文出处 我使用docker至今已有一段时间了，与绝大部分的人一样，我被docker强大的功能和易用性深深的折服。简单方便是docker的核心之一，它强大的功能被抽象成了非常简单的命令。当我在使用和学习docker的时候，我很想知道docker在后台都做了一些什么事情，特别是在网络这一块（我最感兴趣的">
+<meta property="og:updated_time" content="2017-04-13T16:16:35.939Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Docker 有关网络的一篇文章">
+<meta name="twitter:description" content="Docker 网络构造：Docker如何使用Linux iptables 和 Interfaces原文出处 我使用docker至今已有一段时间了，与绝大部分的人一样，我被docker强大的功能和易用性深深的折服。简单方便是docker的核心之一，它强大的功能被抽象成了非常简单的命令。当我在使用和学习docker的时候，我很想知道docker在后台都做了一些什么事情，特别是在网络这一块（我最感兴趣的">
+
+<link rel="apple-touch-icon" href= "/apple-touch-icon.png">
+
+
+    <link rel="alternate" href="/atom.xml" title="RILWEIC" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title>Docker 有关网络的一篇文章 | RILWEIC</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: true
+    }
+</script>
+
+
+    <script>
+        yiliaConfig.jquery_ui = [true, "//cdn.bootcss.com/jqueryui/1.10.4/jquery-ui.min.js", "//cdn.bootcss.com/jqueryui/1.10.4/css/jquery-ui.min.css"];
+    </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+
+</head>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">大喵</a></h1>
+        </hgroup>
+
+        
+
+        
+            <form id="search-form">
+            <input type="text" id="local-search-input" name="q" placeholder="search..." class="search form-control" autocomplete="off" autocorrect="off" searchonload="undefined" />
+            <i class="fa fa-times" onclick="resetSearch()"></i>
+            </form>
+            <div id="local-search-result"></div>
+            <p class='no-result'>No results found <i class='fa fa-spinner fa-pulse'></i></p>
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">所有文章</a></li>
+                        
+                            <li><a href="/tags/">标签云</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                            <li><a href="/msgbord/">留言板</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" href="mailto:rilweic@163.com" title="Email"></a>
+                            
+                                <a class="fa 新浪微博" href="http://weibo.com/3086920317" title="新浪微博"></a>
+                            
+                                <a class="fa GitHub" href="https://github.com/rilweic" title="GitHub"></a>
+                            
+                                <a class="fa RSS" href="/atom.xml" title="RSS"></a>
+                            
+                                <a class="fa QQ" href="tencent://message/?uin=1406830825&Site=&Menu=yes" title="QQ"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/博客配置/">博客配置</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://hexo.io">Hexo</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://pages.github.com/">GitHub</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">混栈攻城狮</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">大喵</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">大喵</a></h1>
+            </hgroup>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">所有文章</a></li>
+                
+                    <li><a href="/tags/">标签云</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                    <li><a href="/msgbord/">留言板</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="mailto:rilweic@163.com" title="Email"></a>
+                            
+                                <a class="fa 新浪微博" target="_blank" href="http://weibo.com/3086920317" title="新浪微博"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="https://github.com/rilweic" title="GitHub"></a>
+                            
+                                <a class="fa RSS" target="_blank" href="/atom.xml" title="RSS"></a>
+                            
+                                <a class="fa QQ" target="_blank" href="tencent://message/?uin=1406830825&Site=&Menu=yes" title="QQ"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我"/>
+</nav>
+      <div class="body-wrap"><article id="post-Docker-有关网络的一篇文章" class="article article-type-post" itemscope itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2017/03/15/Docker-有关网络的一篇文章/" class="article-date">
+      <time datetime="2017-03-15T08:25:00.000Z" itemprop="datePublished">2017-03-15</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy" />
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      Docker 有关网络的一篇文章
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/docker/">docker</a>
+    </div>
+
+
+        
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <h2 id="Docker-网络构造：Docker如何使用Linux-iptables-和-Interfaces"><a href="#Docker-网络构造：Docker如何使用Linux-iptables-和-Interfaces" class="headerlink" title="Docker 网络构造：Docker如何使用Linux iptables 和 Interfaces"></a>Docker 网络构造：Docker如何使用Linux iptables 和 Interfaces</h2><p><a href="http://securitynik.blogspot.ca/2016/12/docker-networking-internals-how-docker_16.html" target="_blank" rel="external">原文出处</a></p>
+<p>我使用docker至今已有一段时间了，与绝大部分的人一样，我被docker强大的功能和易用性深深的折服。简单方便是docker的核心之一，它强大的功能被抽象成了非常简单的命令。当我在使用和学习docker的时候，我很想知道docker在后台都做了一些什么事情，特别是在网络这一块（我最感兴趣的一块）<br><a id="more"></a></p>
+<p>我找到了很多关于创建和操作容器网络的文档，但是关于docker如何使网络工作的却没有那么多。 Docker广泛使用linux iptables和网桥接口，这篇文章是我如何用于创建容器网络的总结，大部分信息来自github上的讨论，演示文稿，以及我自己的测试。文章结尾我会给出我认为非常有用的资料链接。</p>
+<p>我写这篇文章使用的是docker 1.12.3,但这不是作为对docker网络的全面描述，也不作为docker网络的介绍。我只希望这篇文章能给大家开拓视野，也非常感谢所有对文章错误，缺失的反馈和批评。</p>
+<h3 id="Docker网络概览"><a href="#Docker网络概览" class="headerlink" title="Docker网络概览"></a>Docker网络概览</h3><p>Docker的网络建立在允许任何一方编写自己的网络驱动程序的容器网络模型（CNM）之上。这允许不同的网络类型可用于在docker引擎上运行的容器，并且容器可以同时连接到多个网络。除了各种第三方网络驱动程序可用，docker自带四个内置网络驱动程序：</p>
+<ul>
+<li><strong>Bridge</strong>: 这是启动容器的默认网络。通过docker主机上的网桥接口实现连接。 使用相同网桥的容器有自己的子网，并且可以相互通信（默认情况下）。</li>
+<li><strong>Host</strong>:这个驱动程序允许容器访问docker主机自己的网络空间（容器将看到和使用与docker主机相同的接口）。</li>
+<li><strong>Macvlan</strong>:此驱动程序允许容器直接访问主机的接口或子接口（vlan）。 它还允许中继链接。</li>
+<li><strong>Overlay</strong>：此驱动程序允许在运行docker的多个主机（通常是docker群集群）上构建网络。 容器还具有自己的子网和网络地址，并且可以直接相互通信，即使它们在不同的物理主机上运行。</li>
+</ul>
+<p>Bridge和Overlay可能是最常用的网络驱动程序，在本文和下一篇文章中我将主要关注这两个驱动程序。</p>
+<h4 id="Docker-Bridge-网络"><a href="#Docker-Bridge-网络" class="headerlink" title="Docker Bridge 网络"></a>Docker Bridge 网络</h4><p>在docker主机上运行的容器的默认网络是。 Docker在首次安装时创建一个名为“bridge”的默认网络。 我们可以列出所有docker网络来查看此网络 <code>docker network ls</code>：</p>
+<figure class="highlight lasso"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">$ docker network ls</div><div class="line"></div><div class="line">NETWORK ID          NAME                DRIVER              SCOPE</div><div class="line"><span class="number">3e8110</span>efa04a        bridge              bridge              <span class="built_in">local</span></div><div class="line">bb3cd79b9236        docker_gwbridge     bridge              <span class="built_in">local</span></div><div class="line"><span class="number">22849</span>c4d1c3a        host                host                <span class="built_in">local</span></div><div class="line"><span class="number">3</span>kuba8yq3c27        ingress             overlay             swarm</div><div class="line">ecbd1c6c193a        <span class="literal">none</span>                <span class="built_in">null</span>                <span class="built_in">local</span></div></pre></td></tr></table></figure>
+<p>要检查其属性，运行<code>docker network inspect bridge</code></p>
+<figure class="highlight xquery"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div></pre></td><td class="code"><pre><div class="line">$ docker network inspect bridge</div><div class="line">[</div><div class="line">    &#123;</div><div class="line">        <span class="string">"Name"</span>: <span class="string">"bridge"</span>,</div><div class="line">        <span class="string">"Id"</span>: <span class="string">"3e8110efa04a1eb0923d863af719abf5eac871dbac4ae74f133894b8df4b9f5f"</span>,</div><div class="line">        <span class="string">"Scope"</span>: <span class="string">"local"</span>,</div><div class="line">        <span class="string">"Driver"</span>: <span class="string">"bridge"</span>,</div><div class="line">        <span class="string">"EnableIPv6"</span>: false,</div><div class="line">        <span class="string">"IPAM"</span>: &#123;</div><div class="line">            <span class="string">"Driver"</span>: <span class="string">"default"</span>,</div><div class="line">            <span class="string">"Options"</span>: null,</div><div class="line">            <span class="string">"Config"</span>: [</div><div class="line">                &#123;</div><div class="line">                    <span class="string">"Subnet"</span>: <span class="string">"172.18.0.0/16"</span>,</div><div class="line">                    <span class="string">"Gateway"</span>: <span class="string">"172.18.0.1"</span></div><div class="line">                &#125;</div><div class="line">            ]</div><div class="line">        &#125;,</div><div class="line">        <span class="string">"Internal"</span>: false,</div><div class="line">        <span class="string">"Containers"</span>: &#123;&#125;,</div><div class="line">        <span class="string">"Options"</span>: &#123;</div><div class="line">            <span class="string">"com.docker.network.bridge.default_bridge"</span>: <span class="string">"true"</span>,</div><div class="line">            <span class="string">"com.docker.network.bridge.enable_icc"</span>: <span class="string">"true"</span>,</div><div class="line">            <span class="string">"com.docker.network.bridge.enable_ip_masquerade"</span>: <span class="string">"true"</span>,</div><div class="line">            <span class="string">"com.docker.network.bridge.host_binding_ipv4"</span>: <span class="string">"0.0.0.0"</span>,</div><div class="line">            <span class="string">"com.docker.network.bridge.name"</span>: <span class="string">"docker0"</span>,</div><div class="line">            <span class="string">"com.docker.network.driver.mtu"</span>: <span class="string">"1500"</span></div><div class="line">        &#125;,</div><div class="line">        <span class="string">"Labels"</span>: &#123;&#125;</div><div class="line">    &#125;</div><div class="line">]</div></pre></td></tr></table></figure>
+<p>你还可以使用<code>docker network create</code>命令并指定选项<code>--driver bridge</code>创建自己的网络，例如<br><code>docker network create --driver bridge --subnet 192.168.100.0/24 --ip-range 192.168.100.0/ 24 my-bridge-network</code>创建另一个网桥网络，名称为<code>“my-bridge-network”</code>，子网为<code>192.168.100.0/24</code>。</p>
+<h4 id="Linux-网桥接口"><a href="#Linux-网桥接口" class="headerlink" title="Linux 网桥接口"></a>Linux 网桥接口</h4><p>docker创建的每个网桥网络由docker主机上的网桥接口呈现。、 默认桥网络“bridge”通常具有与其相关联的接口docker0，并且使用docker network create命令创建的每个后续网桥网络将具有与其相关联的新接口。<br><figure class="highlight groovy"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">$ ifconfig docker0</div><div class="line">docker0   Link <span class="string">encap:</span>Ethernet  HWaddr <span class="number">02</span>:<span class="number">42</span>:<span class="number">44</span>:<span class="number">88</span>:<span class="string">bd:</span><span class="number">75</span></div><div class="line">          inet <span class="string">addr:</span><span class="number">172.18</span><span class="number">.0</span><span class="number">.1</span>  <span class="string">Bcast:</span><span class="number">0.0</span><span class="number">.0</span><span class="number">.0</span>  <span class="string">Mask:</span><span class="number">255.255</span><span class="number">.0</span><span class="number">.0</span></div><div class="line">          UP BROADCAST MULTICAST  <span class="string">MTU:</span><span class="number">1500</span>  <span class="string">Metric:</span><span class="number">1</span></div><div class="line">          RX <span class="string">packets:</span><span class="number">0</span> <span class="string">errors:</span><span class="number">0</span> <span class="string">dropped:</span><span class="number">0</span> <span class="string">overruns:</span><span class="number">0</span> <span class="string">frame:</span><span class="number">0</span></div><div class="line">          TX <span class="string">packets:</span><span class="number">0</span> <span class="string">errors:</span><span class="number">0</span> <span class="string">dropped:</span><span class="number">0</span> <span class="string">overruns:</span><span class="number">0</span> <span class="string">carrier:</span><span class="number">0</span></div><div class="line"><span class="symbol">          collisions:</span><span class="number">0</span> <span class="string">txqueuelen:</span><span class="number">0</span></div><div class="line">          RX <span class="string">bytes:</span><span class="number">0</span> (<span class="number">0.0</span> B)  TX <span class="string">bytes:</span><span class="number">0</span> (<span class="number">0.0</span> B)</div></pre></td></tr></table></figure></p>
+<p>要找到与你创建的docker网络关联的linux接口，可以使用<code>ifconfig</code>列出所有接口，然后找到你指定了子网的接口，例如，我们想查看我们之前创建的网桥接口<code>my-bridge-network</code>我们可以这样：</p>
+<figure class="highlight x86asm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">$ ifconfig | grep <span class="number">192.168</span><span class="meta">.100</span>. -B <span class="number">1</span></div><div class="line">br-e6bc7d6b75f3 Link encap:Ethernet  HWaddr <span class="number">02</span>:<span class="number">42</span>:bc:f1:<span class="number">91</span>:<span class="number">09</span></div><div class="line">          inet addr:<span class="number">192.168</span><span class="meta">.100</span><span class="meta">.1</span>  Bcast:<span class="number">0.0</span><span class="meta">.0</span><span class="meta">.0</span>  Mask:<span class="number">255.255</span><span class="meta">.255</span><span class="meta">.0</span></div></pre></td></tr></table></figure>
+<p>linux桥接接口与交换机的功能类似，因为它们将不同的接口连接到同一子网，并根据MAC地址转发流量。 我们将在下面看到，连接到网桥网络的每个容器将在docker主机上创建自己的虚拟接口，并且docker引擎将同一网络中的所有容器连接到同一个网桥接口，这将允许它们与彼此进行通信。 您可以使用<code>brctl</code>获取有关网桥状态的更多详细信息。</p>
+<figure class="highlight mipsasm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">$ <span class="keyword">brctl </span><span class="keyword">show </span>docker0</div><div class="line"><span class="keyword">bridge </span>name     <span class="keyword">bridge </span>id               STP enabled     interfaces</div><div class="line">docker0         <span class="number">8000</span>.<span class="number">02424488</span>bd75       no</div></pre></td></tr></table></figure>
+<p>一旦我们有容器运行并连接到这个网络，我们将看到interfaces列下面列出的每个容器的接口。 并且在桥接器接口上运行流量捕获将允许我们看到同一子网上的容器之间的相互通信。</p>
+<h4 id="Linux-虚拟网络接口-veth"><a href="#Linux-虚拟网络接口-veth" class="headerlink" title="Linux 虚拟网络接口(veth)"></a>Linux 虚拟网络接口(veth)</h4><p>容器网络模型（CNM）允许每个容器具有其自己的网络空间。 从容器内部运行<code>ifconfig</code>将显示容器内部的网络接口：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div></pre></td><td class="code"><pre><div class="line"><span class="string">$</span> <span class="string">docker</span> <span class="string">run</span> <span class="bullet">-ti</span> <span class="attr">ubuntu:14.04</span> <span class="string">/bin/bash</span></div><div class="line"><span class="string">root@6622112b507c:/#</span></div><div class="line"><span class="string">root@6622112b507c:/#</span> <span class="string">ifconfig</span></div><div class="line"><span class="string">eth0</span>      <span class="string">Link</span> <span class="attr">encap:Ethernet</span>  <span class="string">HWaddr</span> <span class="number">02</span><span class="string">:42:ac:12:00:02</span></div><div class="line">          <span class="string">inet</span> <span class="attr">addr:172.18.0.2</span>  <span class="attr">Bcast:0.0.0.0</span>  <span class="attr">Mask:255.255.0.0</span></div><div class="line">          <span class="string">inet6</span> <span class="attr">addr:</span> <span class="attr">fe80::42:acff:fe12:2/64</span> <span class="attr">Scope:Link</span></div><div class="line">          <span class="string">UP</span> <span class="string">BROADCAST</span> <span class="string">RUNNING</span> <span class="string">MULTICAST</span>  <span class="attr">MTU:1500</span>  <span class="attr">Metric:1</span></div><div class="line">          <span class="string">RX</span> <span class="attr">packets:9</span> <span class="attr">errors:0</span> <span class="attr">dropped:0</span> <span class="attr">overruns:0</span> <span class="attr">frame:0</span></div><div class="line">          <span class="string">TX</span> <span class="attr">packets:6</span> <span class="attr">errors:0</span> <span class="attr">dropped:0</span> <span class="attr">overruns:0</span> <span class="attr">carrier:0</span></div><div class="line"><span class="attr">          collisions:</span><span class="number">0</span> <span class="attr">txqueuelen:0</span></div><div class="line">          <span class="string">RX</span> <span class="attr">bytes:766</span> <span class="string">(766.0</span> <span class="string">B)</span>  <span class="string">TX</span> <span class="attr">bytes:508</span> <span class="string">(508.0</span> <span class="string">B)</span></div><div class="line"></div><div class="line"></div><div class="line"><span class="string">lo</span>        <span class="string">Link</span> <span class="attr">encap:Local</span> <span class="string">Loopback</span></div><div class="line">          <span class="string">inet</span> <span class="attr">addr:127.0.0.1</span>  <span class="attr">Mask:255.0.0.0</span></div><div class="line">          <span class="string">inet6</span> <span class="attr">addr:</span> <span class="string">::1/128</span> <span class="attr">Scope:Host</span></div><div class="line">          <span class="string">UP</span> <span class="string">LOOPBACK</span> <span class="string">RUNNING</span>  <span class="attr">MTU:65536</span>  <span class="attr">Metric:1</span></div><div class="line">          <span class="string">RX</span> <span class="attr">packets:0</span> <span class="attr">errors:0</span> <span class="attr">dropped:0</span> <span class="attr">overruns:0</span> <span class="attr">frame:0</span></div><div class="line">          <span class="string">TX</span> <span class="attr">packets:0</span> <span class="attr">errors:0</span> <span class="attr">dropped:0</span> <span class="attr">overruns:0</span> <span class="attr">carrier:0</span></div><div class="line"><span class="attr">          collisions:</span><span class="number">0</span> <span class="attr">txqueuelen:0</span></div><div class="line">          <span class="string">RX</span> <span class="attr">bytes:0</span> <span class="string">(0.0</span> <span class="string">B)</span>  <span class="string">TX</span> <span class="attr">bytes:0</span> <span class="string">(0.0</span> <span class="string">B)</span></div></pre></td></tr></table></figure>
+<p>然而，上面看到的eth0只能从那个容器中可用，而在Docker主机的外部，docker会创建一个与其对应的双虚拟接口，并作为到容器外的链接。 这些虚拟接口连接到上面讨论的桥接器接口，以便于在同一子网上的不同容器之间的连接。</p>
+<p>我们可以通过启动连接到默认网桥的两个容器来查看此过程，然后查看docker主机上的接口配置。</p>
+<p>在运行启动任何容器之前，docker0 桥接接口没有连接的接口：</p>
+<figure class="highlight mipsasm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line">$ sudo <span class="keyword">brctl </span><span class="keyword">show </span>docker0</div><div class="line"><span class="keyword">bridge </span>name     <span class="keyword">bridge </span>id               STP enabled     interfaces</div><div class="line">docker0         <span class="number">8000</span>.<span class="number">02424488</span>bd75       no</div></pre></td></tr></table></figure>
+<p>然后我从<code>ubuntu:14.04</code> 镜像启动2个容器</p>
+<figure class="highlight livecodeserver"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">$ docker ps</div><div class="line">CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES</div><div class="line">a754719db594        ubuntu:<span class="number">14.04</span>        <span class="string">"/bin/bash"</span>         <span class="number">5</span> <span class="built_in">seconds</span> ago       Up <span class="number">4</span> <span class="built_in">seconds</span>                            zen_kalam</div><div class="line"><span class="number">976041</span>ec420f        ubuntu:<span class="number">14.04</span>        <span class="string">"/bin/bash"</span>         <span class="number">7</span> <span class="built_in">seconds</span> ago       Up <span class="number">5</span> <span class="built_in">seconds</span>                            stupefied_easley</div></pre></td></tr></table></figure>
+<p>您能马上看到现在有两个接口连接到docker0网桥接口（每个容器一个）</p>
+<figure class="highlight mipsasm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">$ sudo <span class="keyword">brctl </span><span class="keyword">show </span>docker0</div><div class="line"><span class="keyword">bridge </span>name     <span class="keyword">bridge </span>id               STP enabled     interfaces</div><div class="line">docker0         <span class="number">8000</span>.<span class="number">02424488</span>bd75       no              veth2177159</div><div class="line">                                                        vethd8e05dd</div></pre></td></tr></table></figure>
+<p>从其中一个容器ping到google，然后从docker主机对容器的虚拟接口进行流量捕获，将显示容器流量<br><figure class="highlight x86asm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div></pre></td><td class="code"><pre><div class="line">$ docker exec a754719db594 ping google.com</div><div class="line">PING google.com (<span class="number">216.58</span><span class="meta">.217</span><span class="meta">.110</span>) <span class="number">56</span>(<span class="number">84</span>) bytes of data.</div><div class="line"><span class="number">64</span> bytes from iad23s42-<span class="keyword">in</span>-f110<span class="meta">.1e100</span>.net (<span class="number">216.58</span><span class="meta">.217</span><span class="meta">.110</span>): icmp_seq=<span class="number">1</span> ttl=<span class="number">48</span> time=<span class="number">0.849</span> ms</div><div class="line"><span class="number">64</span> bytes from iad23s42-<span class="keyword">in</span>-f110<span class="meta">.1e100</span>.net (<span class="number">216.58</span><span class="meta">.217</span><span class="meta">.110</span>): icmp_seq=<span class="number">2</span> ttl=<span class="number">48</span> time=<span class="number">0.965</span> ms</div><div class="line"><span class="symbol"></span></div><div class="line">ubuntu@swarm02:~$ sudo tcpdump -i veth2177159 icmp</div><div class="line"><span class="symbol">tcpdump:</span> verbose output suppressed, use -v <span class="keyword">or</span> -vv for full protocol decode</div><div class="line">listening on veth2177159, link-type EN10MB (Ethernet), capture size <span class="number">262144</span> bytes</div><div class="line"><span class="number">20</span>:<span class="number">47</span>:<span class="number">12.170815</span> <span class="built_in">IP</span> <span class="number">172.18</span><span class="meta">.0</span><span class="meta">.3</span> &gt; iad23s42-<span class="keyword">in</span>-f14<span class="meta">.1e100</span>.net: ICMP echo request, id <span class="number">14</span>, seq <span class="number">55</span>, length <span class="number">64</span></div><div class="line"><span class="number">20</span>:<span class="number">47</span>:<span class="number">12.171654</span> <span class="built_in">IP</span> iad23s42-<span class="keyword">in</span>-f14<span class="meta">.1e100</span>.net &gt; <span class="number">172.18</span><span class="meta">.0</span><span class="meta">.3</span>: ICMP echo reply, id <span class="number">14</span>, seq <span class="number">55</span>, length <span class="number">64</span></div><div class="line"><span class="number">20</span>:<span class="number">47</span>:<span class="number">13.170821</span> <span class="built_in">IP</span> <span class="number">172.18</span><span class="meta">.0</span><span class="meta">.3</span> &gt; iad23s42-<span class="keyword">in</span>-f14<span class="meta">.1e100</span>.net: ICMP echo request, id <span class="number">14</span>, seq <span class="number">56</span>, length <span class="number">64</span></div><div class="line"><span class="number">20</span>:<span class="number">47</span>:<span class="number">13.171694</span> <span class="built_in">IP</span> iad23s42-<span class="keyword">in</span>-f14<span class="meta">.1e100</span>.net &gt; <span class="number">172.18</span><span class="meta">.0</span><span class="meta">.3</span>: ICMP echo reply, id <span class="number">14</span>, seq <span class="number">56</span>, length <span class="number">64</span></div></pre></td></tr></table></figure></p>
+<p>同样，我们可以从一个容器平到另一个容器。<br>首先，我们需要获取容器的IP地址，这可以通过在容器中运行<code>ifconfig</code>或使用<code>docker inspect</code>命令检查容器来完成：</p>
+<figure class="highlight twig"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="xml">$ docker inspect -f ' </span><span class="template-variable">&#123;&#123; <span class="name">range</span> .NetworkSettings.Networks &#125;&#125;</span><span class="xml"> </span><span class="template-variable">&#123;&#123; .IPAddress &#125;&#125;</span><span class="xml"></span><span class="template-variable">&#123;&#123; end &#125;&#125;</span><span class="xml"> ' a754719db594 </span></div><div class="line">172.18.0.3</div></pre></td></tr></table></figure>
+<p>然后我们从一个容器ping另一个容器</p>
+<figure class="highlight x86asm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">$ docker exec 976041ec420f ping <span class="number">172.18</span><span class="meta">.0</span><span class="meta">.3</span></div><div class="line">PING <span class="number">172.18</span><span class="meta">.0</span><span class="meta">.3</span> (<span class="number">172.18</span><span class="meta">.0</span><span class="meta">.3</span>) <span class="number">56</span>(<span class="number">84</span>) bytes of data.</div><div class="line"><span class="number">64</span> bytes from <span class="number">172.18</span><span class="meta">.0</span><span class="meta">.3</span>: icmp_seq=<span class="number">1</span> ttl=<span class="number">64</span> time=<span class="number">0.070</span> ms</div><div class="line"><span class="number">64</span> bytes from <span class="number">172.18</span><span class="meta">.0</span><span class="meta">.3</span>: icmp_seq=<span class="number">2</span> ttl=<span class="number">64</span> time=<span class="number">0.053</span> ms</div></pre></td></tr></table></figure>
+<p>要从docker主机看到这个流量，我们可以在对应于容器的任何一个虚拟接口上捕获，或者我们可以在桥接口（在这个实例中为docker0）上捕获，显示所有的容器间通信子网：</p>
+<figure class="highlight x86asm"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">$ sudo tcpdump -ni docker0 host <span class="number">172.18</span><span class="meta">.0</span><span class="meta">.2</span> <span class="keyword">and</span> host <span class="number">172.18</span><span class="meta">.0</span><span class="meta">.3</span></div><div class="line"><span class="symbol">tcpdump:</span> verbose output suppressed, use -v <span class="keyword">or</span> -vv for full protocol decode</div><div class="line">listening on docker0, link-type EN10MB (Ethernet), capture size <span class="number">262144</span> bytes</div><div class="line"><span class="number">20</span>:<span class="number">55</span>:<span class="number">37.990831</span> <span class="built_in">IP</span> <span class="number">172.18</span><span class="meta">.0</span><span class="meta">.2</span> &gt; <span class="number">172.18</span><span class="meta">.0</span><span class="meta">.3</span>: ICMP echo request, id <span class="number">14</span>, seq <span class="number">200</span>, length <span class="number">64</span></div><div class="line"><span class="number">20</span>:<span class="number">55</span>:<span class="number">37.990865</span> <span class="built_in">IP</span> <span class="number">172.18</span><span class="meta">.0</span><span class="meta">.3</span> &gt; <span class="number">172.18</span><span class="meta">.0</span><span class="meta">.2</span>: ICMP echo reply, id <span class="number">14</span>, seq <span class="number">200</span>, length <span class="number">64</span></div><div class="line"><span class="number">20</span>:<span class="number">55</span>:<span class="number">38.990828</span> <span class="built_in">IP</span> <span class="number">172.18</span><span class="meta">.0</span><span class="meta">.2</span> &gt; <span class="number">172.18</span><span class="meta">.0</span><span class="meta">.3</span>: ICMP echo request, id <span class="number">14</span>, seq <span class="number">201</span>, length <span class="number">64</span></div><div class="line"><span class="number">20</span>:<span class="number">55</span>:<span class="number">38.990866</span> <span class="built_in">IP</span> <span class="number">172.18</span><span class="meta">.0</span><span class="meta">.3</span> &gt; <span class="number">172.18</span><span class="meta">.0</span><span class="meta">.2</span>: ICMP echo reply, id <span class="number">14</span>, seq <span class="number">201</span>, length <span class="number">64</span></div></pre></td></tr></table></figure>
+<h5 id="定位一个容器的vet接口"><a href="#定位一个容器的vet接口" class="headerlink" title="定位一个容器的vet接口"></a>定位一个容器的vet接口</h5><p>没有直接的方法来找到docker主机上的哪个veth接口链接到容器内的接口，但是在各种docker论坛和github中讨论了几种方法。在我看来最简单的是以下（基于<a href="https://github.com/docker/docker/issues/20224" target="_blank" rel="external">这个</a>解决方案做了稍微的修改），这也取决于<code>ethtool</code>在容器中可访问</p>
+<p>例如：我的系统上运行了3个容器</p>
+<figure class="highlight livecodeserver"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">$ docker ps</div><div class="line">CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES</div><div class="line">ccbf97c72bf5        ubuntu:<span class="number">14.04</span>        <span class="string">"/bin/bash"</span>         <span class="number">3</span> <span class="built_in">seconds</span> ago       Up <span class="number">3</span> <span class="built_in">seconds</span>                            admiring_torvalds</div><div class="line"><span class="number">77</span>d9f02d61f2        ubuntu:<span class="number">14.04</span>        <span class="string">"/bin/bash"</span>         <span class="number">4</span> <span class="built_in">seconds</span> ago       Up <span class="number">4</span> <span class="built_in">seconds</span>                            goofy_borg</div><div class="line"><span class="number">19743</span>c0ddf24        ubuntu:<span class="number">14.04</span>        <span class="string">"/bin/sh"</span>           <span class="number">8</span> minutes ago       Up <span class="number">8</span> minutes                            high_engelbart</div></pre></td></tr></table></figure>
+<p>首先我运行如下命令来获得<code>peer_ifindex</code>号</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="string">$</span> <span class="string">docker</span> <span class="string">exec</span> <span class="number">77</span><span class="string">d9f02d61f2</span> <span class="string">sudo</span> <span class="string">ethtool</span> <span class="bullet">-S</span> <span class="string">eth0</span></div><div class="line"><span class="string">NIC</span> <span class="attr">statistics:</span></div><div class="line"><span class="attr">     peer_ifindex:</span> <span class="number">16</span></div></pre></td></tr></table></figure>
+<p>然后在docker主机上，通过<code>peer_ifindex</code>找到接口名称</p>
+<figure class="highlight pf"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line">$ sudo ip link | grep <span class="number">16</span></div><div class="line"><span class="number">16</span>: veth7bd3604@if15: <span class="variable">&lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt;</span> mtu <span class="number">1500</span> qdisc noqueue master docker0 <span class="keyword">state</span> UP mode DEFAULT <span class="keyword">group</span> <span class="keyword">default</span></div></pre></td></tr></table></figure>
+<p>所以，在目前的情况下，接口名称是：<code>veth7bd3604</code></p>
+<h5 id="iptables"><a href="#iptables" class="headerlink" title="iptables"></a>iptables</h5><p>Docker使用linux iptables来控制与它创建的接口和网络之间的通信。 Linux iptables由不同的表组成，但我们主要关注两个：<code>filter</code>和<code>nat</code>。过滤器是网络或接口的流量的安全规则表,用于允许或拒绝IP地址,而nat包含负责屏蔽IP地址或端口的规则。Docker使用nat允许桥接网络上的容器与docker主机之外的目的地进行通信（否则指向容器网络的路由必须在docker主机的网络中添加）</p>
+<p><strong>iptables:filter</strong></p>
+<p>iptables中的表由对应于处理docker主机上的数据包的不同条件或阶段的不同链组成。默认情况下，过滤器表具有3个链：用于处理到达主机并且去往同一主机的分组的输入链，用于发送到外部目的地的主机的分组的输出链，以及用于进入主机但具有目的地外部主机。每个链由一些规则组成，这些规则规定对分组采取一些措施（例如拒绝或接受分组）以及匹配规则的条件。 顺序处理规则，直到找到匹配项，否则应用链的默认策略。 也可以在表中定义自定义链。</p>
+<p>要查看过滤器表中链的当前配置的规则和默认策略，可以运行<code>iptables -t filter -L</code>（或<code>iptables -L</code>，如果未指定表，则默认使用过滤器表）</p>
+<figure class="highlight ada"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div></pre></td><td class="code"><pre><div class="line">$ sudo iptables -t filter -L</div><div class="line">Chain INPUT (policy <span class="keyword">ACCEPT</span>)</div><div class="line">target     prot opt source               destination</div><div class="line"><span class="keyword">ACCEPT</span>     tcp  <span class="comment">--  anywhere             anywhere             tcp dpt:domain</span></div><div class="line"><span class="keyword">ACCEPT</span>     udp  <span class="comment">--  anywhere             anywhere             udp dpt:domain</span></div><div class="line"><span class="keyword">ACCEPT</span>     tcp  <span class="comment">--  anywhere             anywhere             tcp dpt:bootps</span></div><div class="line"><span class="keyword">ACCEPT</span>     udp  <span class="comment">--  anywhere             anywhere             udp dpt:bootps</span></div><div class="line">Chain FORWARD (policy <span class="keyword">ACCEPT</span>)</div><div class="line">target     prot opt source               destination</div><div class="line">DOCKER-ISOLATION  <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere</span></div><div class="line">DOCKER     <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere</span></div><div class="line"><span class="keyword">ACCEPT</span>     <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere             ctstate RELATED,ESTABLISHED</span></div><div class="line"><span class="keyword">ACCEPT</span>     <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere</span></div><div class="line"><span class="keyword">ACCEPT</span>     <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere</span></div><div class="line">DOCKER     <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere</span></div><div class="line"><span class="keyword">ACCEPT</span>     <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere             ctstate RELATED,ESTABLISHED</span></div><div class="line"><span class="keyword">ACCEPT</span>     <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere</span></div><div class="line"><span class="keyword">ACCEPT</span>     <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere</span></div><div class="line">DOCKER     <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere</span></div><div class="line"><span class="keyword">ACCEPT</span>     <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere             ctstate RELATED,ESTABLISHED</span></div><div class="line"><span class="keyword">ACCEPT</span>     <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere</span></div><div class="line"><span class="keyword">ACCEPT</span>     <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere</span></div><div class="line"><span class="keyword">ACCEPT</span>     <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere</span></div><div class="line">DROP       <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere</span></div><div class="line">Chain OUTPUT (policy <span class="keyword">ACCEPT</span>)</div><div class="line">target     prot opt source               destination</div><div class="line">Chain DOCKER (<span class="number">3</span> references)</div><div class="line">target     prot opt source               destination</div><div class="line">Chain DOCKER-ISOLATION (<span class="number">1</span> references)</div><div class="line">target     prot opt source               destination</div><div class="line">DROP       <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere</span></div><div class="line">DROP       <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere</span></div><div class="line">DROP       <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere</span></div><div class="line">DROP       <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere</span></div><div class="line">DROP       <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere</span></div><div class="line">DROP       <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere</span></div><div class="line"><span class="keyword">RETURN</span>     <span class="keyword">all</span>  <span class="comment">--  anywhere             anywhere</span></div></pre></td></tr></table></figure>
+<p>突出显示的是不同的链，以及每个链的默认策略（没有自定义链的默认策略）。 我们还可以看到Docker已经添加了两个自定义链：<code>Docker</code>和<code>Docker-Isolation</code>，并且在<code>Forward</code>链中插入了以这两个新链作为目标的规则。</p>
+<p><strong><em>Docker-isolation chain</em></strong></p>
+<p><code>Docker-isolation</code>包含限制不同容器网络之间的访问的规则。 要查看更多详细信息，请在运行<code>iptables</code>时使用<code>-v</code>选项</p>
+<figure class="highlight ada"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">$ sudo iptables -t filter -L -v</div><div class="line">….</div><div class="line">Chain DOCKER-ISOLATION (<span class="number">1</span> references)</div><div class="line"> pkts bytes target     prot opt <span class="keyword">in</span>     <span class="keyword">out</span>     source               destination</div><div class="line">    <span class="number">0</span>     <span class="number">0</span> DROP       <span class="keyword">all</span>  <span class="comment">--  br-e6bc7d6b75f3 docker0  anywhere             anywhere</span></div><div class="line">    <span class="number">0</span>     <span class="number">0</span> DROP       <span class="keyword">all</span>  <span class="comment">--  docker0 br-e6bc7d6b75f3  anywhere             anywhere</span></div><div class="line">    <span class="number">0</span>     <span class="number">0</span> DROP       <span class="keyword">all</span>  <span class="comment">--  docker_gwbridge docker0  anywhere             anywhere</span></div><div class="line">    <span class="number">0</span>     <span class="number">0</span> DROP       <span class="keyword">all</span>  <span class="comment">--  docker0 docker_gwbridge  anywhere             anywhere</span></div><div class="line">    <span class="number">0</span>     <span class="number">0</span> DROP       <span class="keyword">all</span>  <span class="comment">--  docker_gwbridge br-e6bc7d6b75f3  anywhere             anywhere</span></div><div class="line">    <span class="number">0</span>     <span class="number">0</span> DROP       <span class="keyword">all</span>  <span class="comment">--  br-e6bc7d6b75f3 docker_gwbridge  anywhere             anywhere</span></div><div class="line"><span class="number">36991</span> <span class="number">3107</span>K <span class="keyword">RETURN</span>     <span class="keyword">all</span>  <span class="comment">--  any    any     anywhere             anywhere</span></div></pre></td></tr></table></figure>
+<p>您可以在上面看到一些删除规则，阻止任何由docker创建的桥接接口之间的流量，从而确保容器网络不能通信。</p>
+<p><strong><em>icc=false</em></strong></p>
+<p>可以传递到<code>docker network create</code>命令的选项之一是<code>com.docker.network.bridge.enable_icc</code>，它代表容器间通信。 将此选项设置为<code>false</code>会阻止同一网络上的容器彼此通信。 这是通过在前向链中添加一个丢弃规则来实现的，该丢弃规则匹配来自与去往同一接口的网络相关联的桥接器接口的分组。</p>
+<p>举个例子，我们用以下命令创建一个新的网络</p>
+<figure class="highlight lsl"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">docker network create --driver bridge --subnet <span class="number">192.168</span><span class="number">.200</span><span class="number">.0</span>/<span class="number">24</span> --ip-range <span class="number">192.168</span><span class="number">.200</span><span class="number">.0</span>/<span class="number">24</span> -o <span class="string">"com.docker.network.bridge.enable_icc"</span>=<span class="string">"false"</span> no-icc-network</div></pre></td></tr></table></figure>
+<figure class="highlight haml"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div></pre></td><td class="code"><pre><div class="line">$ ifconfig | grep 192.168.200 -B 1</div><div class="line">br-8e3f0d353353 Link encap:Ethernet  HWaddr 02:42:c4:6b:f1:40</div><div class="line">          inet addr:192.168.200.1  Bcast:0.0.0.0  Mask:255.255.255.0</div><div class="line"></div><div class="line">$ sudo iptables -t filter -S FORWARD</div><div class="line">-<span class="ruby">P FORWARD ACCEPT</span></div><div class="line">-<span class="ruby">A FORWARD -j DOCKER-ISOLATION</span></div><div class="line">-<span class="ruby">A FORWARD -o br-<span class="number">8</span>e3f0d353353 -j DOCKER</span></div><div class="line">-<span class="ruby">A FORWARD -o br-<span class="number">8</span>e3f0d353353 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT</span></div><div class="line">-<span class="ruby">A FORWARD -i br-<span class="number">8</span>e3f0d353353 ! -o br-<span class="number">8</span>e3f0d353353 -j ACCEPT</span></div><div class="line">-<span class="ruby">A FORWARD -o docker<span class="number">0</span> -j DOCKER</span></div><div class="line">-<span class="ruby">A FORWARD -o docker<span class="number">0</span> -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT</span></div><div class="line">-<span class="ruby">A FORWARD -i docker<span class="number">0</span> ! -o docker<span class="number">0</span> -j ACCEPT</span></div><div class="line">-<span class="ruby">A FORWARD -i docker<span class="number">0</span> -o docker<span class="number">0</span> -j ACCEPT</span></div><div class="line">-<span class="ruby">A FORWARD -o br-e6bc7d6b75f3 -j DOCKER</span></div><div class="line">-<span class="ruby">A FORWARD -o br-e6bc7d6b75f3 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT</span></div><div class="line">-<span class="ruby">A FORWARD -i br-e6bc7d6b75f3 ! -o br-e6bc7d6b75f3 -j ACCEPT</span></div><div class="line">-<span class="ruby">A FORWARD -i br-e6bc7d6b75f3 -o br-e6bc7d6b75f3 -j ACCEPT</span></div><div class="line">-<span class="ruby">A FORWARD -o docker_gwbridge -j DOCKER</span></div><div class="line">-<span class="ruby">A FORWARD -o docker_gwbridge -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT</span></div><div class="line">-<span class="ruby">A FORWARD -i docker_gwbridge ! -o docker_gwbridge -j ACCEPT</span></div><div class="line">-<span class="ruby">A FORWARD -o lxcbr<span class="number">0</span> -j ACCEPT</span></div><div class="line">-<span class="ruby">A FORWARD -i lxcbr<span class="number">0</span> -j ACCEPT</span></div><div class="line">-<span class="ruby">A FORWARD -i docker_gwbridge -o docker_gwbridge -j DROP</span></div><div class="line">-<span class="ruby">A FORWARD -i br-<span class="number">8</span>e3f0d353353 -o br-<span class="number">8</span>e3f0d353353 -j DROP</span></div></pre></td></tr></table></figure>
+<p><strong>iptables:nat</strong></p>
+<p><code>NAT</code>允许主机更改数据包的IP地址或端口。在这种情况下,它用于屏蔽源IP地址来自docker网络（例如172.18.0.0/24子网中的主机），目的地为容器外，位于docker主机的IP地址之后的数据包。此功能由<code>com.docker.network.bridge.enable_ip_masquerade</code>选项控制，可以在<code>docker network create</code>（如果未指定，则默认为true）命令中使用。</p>
+<p>你可以在iptables的nat表中看到此命令的效果</p>
+<pre>
+$ sudo iptables -t nat -L
+Chain PREROUTING (policy ACCEPT)
+target     prot opt source               destination
+DOCKER     all  --  anywhere             anywhere             ADDRTYPE match dst-type LOCAL
+
+
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination
+
+
+Chain OUTPUT (policy ACCEPT)
+target     prot opt source               destination
+DOCKER     all  --  anywhere            !127.0.0.0/8          ADDRTYPE match dst-type LOCAL
+
+
+Chain POSTROUTING (policy ACCEPT)
+target     prot opt source               destination
+MASQUERADE  all  --  172.18.0.0/16        anywhere
+MASQUERADE  all  --  192.168.100.0/24     anywhere
+MASQUERADE  all  --  172.19.0.0/16        anywhere
+MASQUERADE  all  --  10.0.3.0/24         !10.0.3.0/24
+
+
+Chain DOCKER (2 references)
+target     prot opt source               destination
+RETURN     all  --  anywhere             anywhere
+RETURN     all  --  anywhere             anywhere
+RETURN     all  --  anywhere             anywhere
+</pre>
+
+<p>在<code>postrouting</code>链中，您可以看到在与自己网络外部的任何主机通信时，通过应用伪装操作创建的所有docker网络。</p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><ul>
+<li>网桥网络在docker主机上具有对应的linux网桥接口，其作为layer2交换机，并且连接在同一子网上的不同容器。</li>
+<li>容器中的每个网络接口在Docker主机上具有在容器运行时创建的对应虚拟接口。</li>
+<li>桥接接口上来自Docker主机的流量捕获等效于在交换机上配置SPAN端口，可以在该网络上查看所有集群间通信。</li>
+<li>在虚拟接口（veth- *）上来自docker主机的流量捕获将显示容器在特定子网上发送的所有流量</li>
+<li>Linux iptables规则用于阻止不同的网络（有时网络中的主机）使用过滤器表进行通信。 这些规则通常添加在<code>DOCKER-ISOLATION</code>链中。</li>
+<li>容器通过桥接接口与外部通信，其IP被隐藏在docker主机的IP地址后面。 这是通过向<code>iptables</code>中的<code>nat</code>表添加规则来实现的。</li>
+</ul>
+<h3 id="链接-资源"><a href="#链接-资源" class="headerlink" title="链接/资源"></a>链接/资源</h3><p><a href="https://github.com/docker/labs/tree/master/networking/concepts" target="_blank" rel="external"><strong>Docker networking concepts</strong></a></p>
+<p><a href="https://www.youtube.com/watch?v=nXaF2d97JnE" target="_blank" rel="external"><strong>Deep dive into Docker 1.12 Networking</strong></a></p>
+<p><a href="https://docs.docker.com/engine/userguide/networking/" target="_blank" rel="external"><strong>Docker container networking user guide</strong></a></p>
+<p><a href="https://wiki.archlinux.org/index.php/Iptables#Tables" target="_blank" rel="external"><strong>Linux iptables overview</strong></a></p>
+<p>原文作者： <a href="https://plus.google.com/111321614537507172826" target="_blank" rel="external">Abdul Kittana</a></p>
+
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2017/03/15/Docker-有关网络的一篇文章/">Docker 有关网络的一篇文章</a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">大喵</a></p>
+        <p><span>发布时间:</span>2017-03-15, 16:25:00</p>
+        <p><span>最后更新:</span>2017-04-14, 00:16:35</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2017/03/15/Docker-有关网络的一篇文章/" title="Docker 有关网络的一篇文章">rilweic.github.io/2017/03/15/Docker-有关网络的一篇文章/</a>
+            <span class="copy-path" data-clipboard-text="原文: rilweic.github.io/2017/03/15/Docker-有关网络的一篇文章/　　作者: 大喵" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target = "_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+            <div id="article-nav-newer" class="article-nav-title">
+                <a href="/2017/03/15/博客搭建过程/">
+                    博客搭建过程
+                </a>
+            </div>
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2017/03/18/WordPress-安装配置记录/">
+                    WordPress 配置发邮件
+                </a>
+            </div>
+        
+    </nav>
+
+  
+</article>
+
+    <div id="toc" class="toc-article">
+        <strong class="toc-title">文章目录</strong>
+        
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#Docker-网络构造：Docker如何使用Linux-iptables-和-Interfaces"><span class="toc-number">1.</span> <span class="toc-text">Docker 网络构造：Docker如何使用Linux iptables 和 Interfaces</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#Docker网络概览"><span class="toc-number">1.1.</span> <span class="toc-text">Docker网络概览</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#Docker-Bridge-网络"><span class="toc-number">1.1.1.</span> <span class="toc-text">Docker Bridge 网络</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#Linux-网桥接口"><span class="toc-number">1.1.2.</span> <span class="toc-text">Linux 网桥接口</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#Linux-虚拟网络接口-veth"><span class="toc-number">1.1.3.</span> <span class="toc-text">Linux 虚拟网络接口(veth)</span></a><ol class="toc-child"><li class="toc-item toc-level-5"><a class="toc-link" href="#定位一个容器的vet接口"><span class="toc-number">1.1.3.1.</span> <span class="toc-text">定位一个容器的vet接口</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#iptables"><span class="toc-number">1.1.3.2.</span> <span class="toc-text">iptables</span></a></li></ol></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#总结"><span class="toc-number">1.2.</span> <span class="toc-text">总结</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#链接-资源"><span class="toc-number">1.3.</span> <span class="toc-text">链接/资源</span></a></li></ol></li></ol>
+        
+    </div>
+    <style>
+        .left-col .switch-btn,
+        .left-col .switch-area {
+            display: none;
+        }
+        .toc-level-3 i,
+        .toc-level-3 ol {
+            display: none !important;
+        }
+    </style>
+
+    <input type="button" id="tocButton" value="隐藏目录"  title="点击按钮隐藏或者显示文章目录">
+
+    <script>
+        yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+    </script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></i></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":"Docker 有关网络的一篇文章　| RILWEIC　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+        <section class="youyan" id="comments">
+    <script>
+        var loadComment = function(){
+            var d = document, s = d.createElement('script');
+            s.src = 'http://v2.uyan.cc/code/uyan.js?uid=2127434';
+            (d.head || d.body).appendChild(s);
+        }
+    </script>
+    
+    <script> loadComment(); </script>
+
+    <div id="uyan_frame"></div>
+</section>
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/2017/03/15/博客搭建过程/" title="上一篇: 博客搭建过程">
+                <i class="fa fa-angle-left"></i>
+            </a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2017/03/18/WordPress-安装配置记录/" title="下一篇: WordPress 配置发邮件">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2017/03/18/WordPress-安装配置记录/">WordPress 配置发邮件</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/03/15/Docker-有关网络的一篇文章/">Docker 有关网络的一篇文章</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/03/15/博客搭建过程/">博客搭建过程</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2017 大喵
+            </div>
+            <div class="footer-right">
+		<!--
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.5">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+         -->   
+	</div>
+        </div> 
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style='display:none'>
+                        <span id="site-visit" title="本站到访数"><i class="fa fa-user" aria-hidden="true"></i><span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>| </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style='display:none'>
+                        <span id="page-visit"  title="本页阅读量"><i class="fa fa-eye animated infinite pulse" aria-hidden="true"></i><span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            var iPad = window.navigator.userAgent.indexOf('iPad');
+            if (iPad > -1 || $(".left-col").css("display") === "none") {
+                var bgColorList = ["#9db3f4", "#414141", "#e5a859", "#f5dfc6", "#c084a0", "#847e72", "#cd8390", "#996731"];
+                var bgColor = Math.ceil(Math.random() * (bgColorList.length - 1));
+                $("body").css({"background-color": bgColorList[bgColor], "background-size": "cover"});
+            }
+            else {
+                var backgroundnum = 5;
+                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
+            }
+        })
+    </script>
+
+
+
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script>
+    // Open in New Window
+    
+        var oOpenInNew = {
+            
+            
+            
+            
+             categories: ".article-category a, a.tag-list-link", 
+            
+             archives: ".archive-article-title", 
+             miniArchives: "a.post-list-link", 
+            
+             friends: "#js-friends a", 
+             socail: ".social a" 
+        }
+        for (var x in oOpenInNew) {
+            $(oOpenInNew[x]).attr("target", "_blank");
+        }
+    
+</script>
+
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>
