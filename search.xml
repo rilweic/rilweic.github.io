@@ -95,7 +95,7 @@
 <p><span class="s1">6.查看服务是否运行</span></p>
 <p><span class="s1">在宿主机中我们输入localhost:5000访问，出现如下界面，表示Tomcat成功运行。 </span></p>
 <p><span class="s1">至此，我们就成功的创建了一个Tomcat镜像了，当然这里只是为了简单演示，所以镜像做的比较简单，官方的Tomcat镜像比这复杂的多，在熟悉了Dockerfile后可以去看看官方的做法。</span></p>
-<p><span class="s1">6.其他</span></p>
+<p><span class="s1">7.其他</span></p>
 <p><span class="s1">在做镜像的时候有那么多步骤，根本不可能一次将所有的步骤完成，所以，这里教给大家一个小技巧。</span></p>
 <p><span class="s1">在编写完Dockerfile到第二步的时候，其实可以先使用一个脚本先运行着，然后进入容器内部进行操作。笔者在编写Dockerfile时先使用如下命令</span></p>
 <blockquote>
